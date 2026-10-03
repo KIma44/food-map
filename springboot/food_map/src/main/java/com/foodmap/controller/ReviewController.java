@@ -6,8 +6,10 @@ import com.foodmap.security.CustomUserDetails;
 import com.foodmap.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,22 +22,18 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
-    // [리뷰 작성] - 로그인한 사용자만 가능
-    @PostMapping(consumes = {"multipart/form-data"})
-    public ResponseEntity<String> createReview(
-            @RequestPart("reviewDto") ReviewRequestDto reviewDto,
+    // [리뷰 작성] - "/api/reviews" 경로로 매핑됨
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> createReview(
+            @RequestPart("reviewDto") ReviewRequestDto dto,
             @RequestPart(value = "images", required = false) List<MultipartFile> images,
-            @AuthenticationPrincipal CustomUserDetails userDetails
+            @AuthenticationPrincipal CustomUserDetails customUserDetails // 프로젝트에 맞는 UserDetails 구현체
     ) {
-        // 토큰이 없거나 유효하지 않은 경우 (401 Unauthorized 반환)
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인이 필요한 서비스입니다.");
-        }
+        // 인증 객체에서 userId 추출 (CustomUserDetails 구현에 맞춰 id 가져오기)
+        Long userId = customUserDetails.getUserId();
 
-        Long userId = userDetails.getUserId();
-        reviewService.createReview(userId, reviewDto, images);
-
-        return ResponseEntity.ok("리뷰가 성공적으로 등록되었습니다.");
+        reviewService.createReview(userId, dto, images);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     // [베스트 리뷰 상위 3개 조회] - 로그인 없이 누구나 가능

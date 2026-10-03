@@ -30,19 +30,15 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                // CORS 필터를 최우선으로 적용
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // 1. 공통 공개 엔드포인트
                         .requestMatchers("/api/join", "/api/login", "/api/auth/**", "/uploads/**").permitAll()
-
-                        // 2. 리뷰 관련 모든 GET 요청(top3 포함) 누구나 접근 허용
                         .requestMatchers(HttpMethod.GET, "/api/reviews", "/api/reviews/**").permitAll()
-
-                        // 3. 그 외 작성(POST), 수정(PUT), 삭제(DELETE) 등은 인증 필요
                         .anyRequest().authenticated()
                 )
-                // JWT 필터
+                // JwtAuthenticationFilter 보다 앞에 CorsFilter 추가
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

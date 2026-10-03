@@ -80,15 +80,18 @@ export function ReviewWrite() {
       const formData = new FormData();
 
       // Restaurant 자동 등록 및 Review 저장을 위한 데이터
+      // ReviewWrite.jsx 의 handleSubmit 내부
+
       const reviewData = {
-        placeId: place.id,
-        placeName: place.place_name || place.name,
-        address: place.road_address_name || place.address,
-        category: place.category_name || '',
+        // Kakao place.id(문자열)를 숫자로 변환하여 전송
+        placeId: place.id ? parseInt(place.id, 10) : null, 
+        placeName: place.place_name || place.name || '',
+        address: place.road_address_name || place.address || '',
+        category: place.category_name || place.category || '',
         phone: place.phone || '',
         latitude: place.y ? parseFloat(place.y) : null,
         longitude: place.x ? parseFloat(place.x) : null,
-        rating: rating,
+        rating: Number(rating),
         content: content,
       };
 
