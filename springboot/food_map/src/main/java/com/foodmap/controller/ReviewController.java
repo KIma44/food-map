@@ -42,4 +42,17 @@ public class ReviewController {
         List<ReviewResponseDto> topReviews = reviewService.getTop3Reviews(restaurantId);
         return ResponseEntity.ok(topReviews);
     }
+
+    // 리뷰 수정 로그인한 본인만 가능 / 관리자도 안됨 관리자 다른 사용자 삭제만 가능하게 할 예정
+    @PutMapping(value = "/{reviewId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> updateReview(
+            @PathVariable("reviewId") Long reviewId,
+            @RequestPart("reviewDto") ReviewRequestDto dto,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails
+    ) {
+        Long userId = customUserDetails.getUserId();
+        reviewService.updateReview(userId, reviewId, dto, images);
+        return ResponseEntity.ok().build();
+    }
 }

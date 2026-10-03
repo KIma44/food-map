@@ -28,6 +28,7 @@ export function Login({ setIsLoggedIn }) {
       if (accessToken) localStorage.setItem('accessToken', accessToken);
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
       if (name) localStorage.setItem('userName', name);
+      localStorage.setItem('userEmail', formData.email);
       if (profile) {
         localStorage.setItem('userProfile', profile);
       } else {

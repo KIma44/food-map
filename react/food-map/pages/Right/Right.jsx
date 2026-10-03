@@ -26,14 +26,17 @@ export function Right({
   const isUserLoggedIn = isLoggedIn || !!token;
 
   const userName = localStorage.getItem('userName') || '사용자';
-  const rawProfile = localStorage.getItem('userProfile');
   
+  // 💡 [수정] localStorage에서 로그인한 유저의 이메일 가져오기 (소문자 및 공백 처리)
+  const currentUserEmail = (localStorage.getItem('userEmail') || '').trim().toLowerCase(); 
+  
+  const rawProfile = localStorage.getItem('userProfile');
   const profileImageUrl = 
     rawProfile && rawProfile !== 'null' && rawProfile !== 'undefined' && rawProfile.trim() !== ''
       ? (rawProfile.startsWith('http') ? rawProfile : `http://localhost:8080${rawProfile}`)
       : defaultProfileImg;
 
-  // 선택된 맛집이 바뀔 때 평점 상위 3개 리뷰 조회 (비로그인 사용자도 접근 가능)
+  // 선택된 맛집이 바뀔 때 평점 상위 3개 리뷰 조회
   useEffect(() => {
     if (!selectedPlace) {
       setTopReviews([]);
@@ -44,7 +47,6 @@ export function Right({
       setIsLoadingReviews(true);
       try {
         const restaurantId = selectedPlace.id;
-        // [수정] 백엔드 @RequestParam("restaurantId") 명칭에 맞춰 params 변경
         const response = await api.get('/api/reviews/top3', {
           params: { restaurantId }
         });
@@ -77,6 +79,8 @@ export function Right({
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userName');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
     localStorage.removeItem('userProfile');
 
     if (setIsLoggedIn) setIsLoggedIn(false);
@@ -100,6 +104,31 @@ export function Right({
         place: selectedPlace
       }
     });
+  };
+
+  // ✏️ 리뷰 수정 페이지로 이동 핸들러
+  const handleEditReview = (review) => {
+    navigate('/review/write', {
+      state: {
+        place: selectedPlace,
+        review: review,
+        isEdit: true
+      }
+    });
+  };
+
+  // 🗑️ 리뷰 삭제 핸들러
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm('정말 이 리뷰를 삭제하시겠습니까?')) return;
+
+    try {
+      await api.delete(`/api/reviews/${reviewId}`);
+      alert('리뷰가 삭제되었습니다.');
+      setTopReviews((prev) => prev.filter((item) => item.reviewId !== reviewId));
+    } catch (error) {
+      console.error('리뷰 삭제 실패:', error);
+      alert('리뷰 삭제 중 오류가 발생했습니다.');
+    }
   };
 
   return (
@@ -170,25 +199,47 @@ export function Right({
                 ) : topReviews.length > 0 ? (
                   <div css={s.reviewList}>
                     {topReviews.map((review) => {
-                      // 이미지 상대 경로가 있을 경우 백엔드 서버 URL(http://localhost:8080) 결합
                       const reviewImgUrl = review.imageUrl
                         ? (review.imageUrl.startsWith('http') 
                             ? review.imageUrl 
                             : `http://localhost:8080${review.imageUrl}`)
                         : null;
 
+                      // 💡 [핵심 수정] 오직 이메일로만 본인 작성 여부 비교!
+                      const reviewEmail = (review.email || '').trim().toLowerCase();
+                      const isMyReview = isUserLoggedIn && 
+                        currentUserEmail !== '' && 
+                        reviewEmail === currentUserEmail;
+
                       return (
                         <div key={review.reviewId} css={s.reviewItem}>
                           <div css={s.reviewHeader}>
-                            {/* 1. 작성자 닉네임 표시 */}
-                            <span css={s.reviewAuthor}>{review.userName}</span>
+                            <span css={s.reviewAuthor}>{review.email}</span>
                             <span css={s.reviewRating}>★ {review.rating}</span>
+
+                            {/* ✏️ 로그인한 본인의 이메일과 일치할 때만 수정/삭제 버튼 표시 */}
+                            {isMyReview && (
+                              <div css={s.myReviewActionBtns}>
+                                <button 
+                                  type="button" 
+                                  css={s.editBtn} 
+                                  onClick={() => handleEditReview(review)}
+                                >
+                                  수정
+                                </button>
+                                <button 
+                                  type="button" 
+                                  css={s.deleteBtn} 
+                                  onClick={() => handleDeleteReview(review.reviewId)}
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            )}
                           </div>
 
-                          {/* 2. 리뷰 내용 */}
                           <p css={s.reviewContent}>{review.content}</p>
 
-                          {/* 3. 리뷰 사진 표시 (이미지 URL이 존재할 때만 렌더링) */}
                           {reviewImgUrl && (
                             <div css={s.reviewImageWrapper}>
                               <img 
@@ -196,7 +247,7 @@ export function Right({
                                 alt="리뷰 사진" 
                                 css={s.reviewImg}
                                 onError={(e) => {
-                                  e.target.style.display = 'none'; // 이미지 불러오기 실패 시 엑박 대신 숨김
+                                  e.target.style.display = 'none';
                                 }}
                               />
                             </div>
@@ -242,7 +293,7 @@ export function Right({
                   </div>
                   <div css={s.placeInfo}>
                     <span css={s.categoryTag}>{place.category}</span>
-                    <span>• {place.distance}</span>
+                    <span> {place.distance}</span>
                   </div>
                 </div>
               ))

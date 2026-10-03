@@ -43,4 +43,13 @@ public class Review {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // 리뷰 수정
+    public void updateReview(String content, Double rating, String imageUrl) {
+        this.content = content;
+        this.rating = rating;
+        if (imageUrl != null) {
+            this.imageUrl = imageUrl;
+        }
+    }
 }

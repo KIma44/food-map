@@ -1,5 +1,5 @@
 /** @jsxImportSource @emotion/react */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as s from './styles.js';
 import api from '../../api/api.js';
@@ -9,15 +9,27 @@ export function ReviewWrite() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 전달받은 맛집 정보
+  // 전달받은 맛집 정보 및 수정 관련 정보 추출
   const place = location.state?.place;
+  const review = location.state?.review; // 수정 시 전달되는 기존 리뷰 데이터
+  const isEdit = location.state?.isEdit || false; // 수정 모드 여부
 
-  // 상태 관리
-  const [rating, setRating] = useState(5);
-  const [content, setContent] = useState('');
+  // [수정 모드 지원] 기존 리뷰 정보가 전달되면 초기값으로 세팅
+  const [rating, setRating] = useState(isEdit && review ? review.rating : 5);
+  const [content, setContent] = useState(isEdit && review ? review.content : '');
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // [수정 모드 지원] 기존 등록된 이미지가 있다면 미리보기에 세팅
+  useEffect(() => {
+    if (isEdit && review?.imageUrl) {
+      const fullImageUrl = review.imageUrl.startsWith('http')
+        ? review.imageUrl
+        : `http://localhost:8080${review.imageUrl}`;
+      setImagePreviews([fullImageUrl]);
+    }
+  }, [isEdit, review]);
 
   // 맛집 정보 없이 예외 접근 시 처리
   if (!place) {
@@ -54,6 +66,7 @@ export function ReviewWrite() {
 
   // 이미지 삭제 핸들러
   const handleRemoveImage = (index) => {
+    // 기존에 있던 서버 이미지를 지운 경우와 새로 추가한 로컬 파일을 지운 경우 모두 고려
     setImages(images.filter((_, i) => i !== index));
     setImagePreviews(imagePreviews.filter((_, i) => i !== index));
   };
@@ -80,17 +93,14 @@ export function ReviewWrite() {
       const formData = new FormData();
 
       // Restaurant 자동 등록 및 Review 저장을 위한 데이터
-      // ReviewWrite.jsx 의 handleSubmit 내부
-
       const reviewData = {
-        // Kakao place.id(문자열)를 숫자로 변환하여 전송
         placeId: place.id ? parseInt(place.id, 10) : null, 
         placeName: place.place_name || place.name || '',
         address: place.road_address_name || place.address || '',
         category: place.category_name || place.category || '',
         phone: place.phone || '',
-        latitude: place.y ? parseFloat(place.y) : null,
-        longitude: place.x ? parseFloat(place.x) : null,
+        latitude: place.y ? parseFloat(place.y) : (place.latitude ? parseFloat(place.latitude) : null),
+        longitude: place.x ? parseFloat(place.x) : (place.longitude ? parseFloat(place.longitude) : null),
         rating: Number(rating),
         content: content,
       };
@@ -104,13 +114,19 @@ export function ReviewWrite() {
         formData.append('images', image);
       });
 
-      await api.post('/api/reviews', formData);
+      // ✏️ [분기 처리] 수정 모드(isEdit)일 때는 PUT 요청, 작성일 때는 POST 요청
+      if (isEdit && review) {
+        await api.put(`/api/reviews/${review.reviewId}`, formData);
+        alert('리뷰가 성공적으로 수정되었습니다!');
+      } else {
+        await api.post('/api/reviews', formData);
+        alert('리뷰가 성공적으로 등록되었습니다!');
+      }
 
-      alert('리뷰가 성공적으로 등록되었습니다!');
       navigate(-1);
     } catch (error) {
-      console.error('리뷰 등록 실패:', error);
-      alert('리뷰 등록 중 오류가 발생했습니다.');
+      console.error(isEdit ? '리뷰 수정 실패:' : '리뷰 등록 실패:', error);
+      alert(isEdit ? '리뷰 수정 중 오류가 발생했습니다.' : '리뷰 등록 중 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -120,7 +136,8 @@ export function ReviewWrite() {
     <ReviewLayout>
       <div css={s.container}>
         <div css={s.header}>
-          <h2>리뷰 작성</h2>
+          {/* ✏️ 수정 모드 여부에 맞춰 제목 표시 */}
+          <h2>{isEdit ? '리뷰 수정' : '리뷰 작성'}</h2>
           <button type="button" css={s.closeBtn} onClick={() => navigate(-1)}>✕</button>
         </div>
 
@@ -189,7 +206,8 @@ export function ReviewWrite() {
           </div>
 
           <button type="submit" css={s.submitBtn} disabled={isSubmitting}>
-            {isSubmitting ? '등록 중...' : '작성 완료'}
+            {/* ✏️ 수정 모드 여부에 맞춰 버튼 텍스트 변경 */}
+            {isSubmitting ? '처리 중...' : isEdit ? '수정 완료' : '작성 완료'}
           </button>
         </form>
       </div>

@@ -14,16 +14,18 @@ public class ReviewResponseDto {
 
     private Long reviewId;
     private Long userId;
-    private String userName; // 작성자 닉네임 추가
+    private String userName; // 작성자 닉네임
+    private String email;
     private Double rating;
     private String content;
     private String imageUrl;
 
-    public static ReviewResponseDto fromEntity(Review review, String userName) {
+    public static ReviewResponseDto fromEntity(Review review, String userName,String email) {
         return ReviewResponseDto.builder()
                 .reviewId(review.getReviewId())
                 .userId(review.getUserId())
                 .userName(userName)
+                .email(email)
                 .rating(review.getRating())
                 .content(review.getContent())
                 .imageUrl(review.getImageUrl())
