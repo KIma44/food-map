@@ -299,12 +299,6 @@ export const reviewItem = css`
   padding: 8px 10px;
 `;
 
-export const reviewHeader = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-`;
 
 export const reviewRating = css`
   font-size: 12px;
@@ -318,4 +312,31 @@ export const reviewContent = css`
   margin: 0;
   line-height: 1.4;
   word-break: break-all;
+`;
+
+export const reviewHeader = css`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+`;
+
+export const reviewAuthor = css`
+  font-weight: bold;
+  font-size: 14px;
+  color: #333;
+`;
+
+export const reviewImageWrapper = css`
+  margin-top: 8px;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+`;
+
+export const reviewImg = css`
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  display: block;
 `;

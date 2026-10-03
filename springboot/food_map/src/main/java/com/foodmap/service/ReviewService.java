@@ -4,8 +4,10 @@ import com.foodmap.dto.ReviewRequestDto;
 import com.foodmap.dto.ReviewResponseDto;
 import com.foodmap.entity.Restaurant;
 import com.foodmap.entity.Review;
+import com.foodmap.entity.User;
 import com.foodmap.repository.RestaurantRepository;
 import com.foodmap.repository.ReviewRepository;
+import com.foodmap.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ public class ReviewService {
     private final RestaurantRepository restaurantRepository;
     private final ReviewRepository reviewRepository;
     private final FileService fileService; // S3Service 대신 FileService 주입
+    private final UserRepository userRepository;
 
     @Transactional
     public void createReview(Long userId, ReviewRequestDto dto, List<MultipartFile> images) {
@@ -64,7 +67,14 @@ public class ReviewService {
         List<Review> topReviews = reviewRepository.findTop3ByRestaurant_RestaurantIdOrderByRatingDesc(restaurantId);
 
         return topReviews.stream()
-                .map(ReviewResponseDto::fromEntity)
+                .map(review -> {
+                    // userId로 회원 정보를 찾아 닉네임 추출
+                    String userName = userRepository.findById(review.getUserId())
+                            .map(User::getName) // User 엔티티의 닉네임 필드명
+                            .orElse("회원");
+
+                    return ReviewResponseDto.fromEntity(review, userName);
+                })
                 .collect(Collectors.toList());
     }
 }

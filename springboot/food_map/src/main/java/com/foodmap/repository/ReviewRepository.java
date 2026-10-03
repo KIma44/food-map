@@ -13,6 +13,6 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     List<Review> findByUserId(Long userId);
 
-    // [수정] PlaceId 대신 Restaurant_RestaurantId 사용 (Long 타입)
+    //] PlaceId 대신 Restaurant_RestaurantId 사용 (Long 타입)
     List<Review> findTop3ByRestaurant_RestaurantIdOrderByRatingDesc(Long restaurantId);
 }

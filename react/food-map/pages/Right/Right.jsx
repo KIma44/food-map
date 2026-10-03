@@ -169,14 +169,41 @@ export function Right({
                   <p css={s.infoText}>리뷰를 가져오는 중...</p>
                 ) : topReviews.length > 0 ? (
                   <div css={s.reviewList}>
-                    {topReviews.map((review) => (
-                      <div key={review.reviewId} css={s.reviewItem}>
-                        <div css={s.reviewHeader}>
-                          <span css={s.reviewRating}>★ {review.rating}</span>
+                    {topReviews.map((review) => {
+                      // 이미지 상대 경로가 있을 경우 백엔드 서버 URL(http://localhost:8080) 결합
+                      const reviewImgUrl = review.imageUrl
+                        ? (review.imageUrl.startsWith('http') 
+                            ? review.imageUrl 
+                            : `http://localhost:8080${review.imageUrl}`)
+                        : null;
+
+                      return (
+                        <div key={review.reviewId} css={s.reviewItem}>
+                          <div css={s.reviewHeader}>
+                            {/* 1. 작성자 닉네임 표시 */}
+                            <span css={s.reviewAuthor}>{review.userName}</span>
+                            <span css={s.reviewRating}>★ {review.rating}</span>
+                          </div>
+
+                          {/* 2. 리뷰 내용 */}
+                          <p css={s.reviewContent}>{review.content}</p>
+
+                          {/* 3. 리뷰 사진 표시 (이미지 URL이 존재할 때만 렌더링) */}
+                          {reviewImgUrl && (
+                            <div css={s.reviewImageWrapper}>
+                              <img 
+                                src={reviewImgUrl} 
+                                alt="리뷰 사진" 
+                                css={s.reviewImg}
+                                onError={(e) => {
+                                  e.target.style.display = 'none'; // 이미지 불러오기 실패 시 엑박 대신 숨김
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
-                        <p css={s.reviewContent}>{review.content}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p css={s.infoText}>등록된 리뷰가 없습니다.</p>
