@@ -10,33 +10,30 @@ import java.util.UUID;
 @Service
 public class FileService {
 
-    // 로컬 저장 경로 (프로젝트루트/uploads/reviews/)
-    private final String uploadDir = System.getProperty("user.dir") + "/uploads/reviews/";
+    private final String uploadDir = System.getProperty("user.dir") + File.separator + "uploads" + File.separator + "reviews" + File.separator;
 
     public String saveFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             return null;
         }
 
-        // 폴더가 없으면 생성
         File dir = new File(uploadDir);
         if (!dir.exists()) {
-            dir.mkdirs();
+            dir.mkdirs(); // uploads/reviews 디렉터리가 없으면 자동 생성
         }
 
-        // 파일명 중복 방지를 위한 UUID 생성
         String originalFilename = file.getOriginalFilename();
         String storeFilename = UUID.randomUUID().toString() + "_" + originalFilename;
 
         File dest = new File(uploadDir + storeFilename);
 
         try {
-            file.transferTo(dest); // 파일 저장
+            file.transferTo(dest);
         } catch (IOException e) {
             throw new RuntimeException("파일 저장 중 오류가 발생했습니다.", e);
         }
 
-        // DB에 저장할 상대 경로 또는 파일명 반환
+        // DB 저장 및 React 프론트엔드 반환용 상대 URL 경로
         return "/uploads/reviews/" + storeFilename;
     }
 }

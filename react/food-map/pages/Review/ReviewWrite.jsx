@@ -9,30 +9,54 @@ export function ReviewWrite() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 전달받은 맛집 정보 및 수정 관련 정보 추출
   const place = location.state?.place;
-  const review = location.state?.review; // 수정 시 전달되는 기존 리뷰 데이터
-  const isEdit = location.state?.isEdit || false; // 수정 모드 여부
+  const review = location.state?.review;
+  const isEdit = location.state?.isEdit || false;
 
-  // [수정 모드 지원] 기존 리뷰 정보가 전달되면 초기값으로 세팅
   const [rating, setRating] = useState(isEdit && review ? review.rating : 5);
   const [content, setContent] = useState(isEdit && review ? review.content : '');
-  const [images, setImages] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
+  
+  // 기존 서버 이미지 중 남겨둘 URL 목록
+  const [existingImages, setExistingImages] = useState([]);
+  // 새로 추가할 로컬 File 객체 목록
+  const [newFiles, setNewFiles] = useState([]);
+  // 미리보기 표시용 객체 목록 [{ id, src, isExisting }]
+  const [previews, setPreviews] = useState([]);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // [수정 모드 지원] 기존 등록된 이미지가 있다면 미리보기에 세팅
+  // [수정 모드] 기존 등록된 이미지 미리보기 세팅
   useEffect(() => {
-    if (isEdit && review?.imageUrl) {
-      const fullImageUrl = review.imageUrl.startsWith('http')
-        ? review.imageUrl
-        : `http://localhost:8080${review.imageUrl}`;
-      setImagePreviews([fullImageUrl]);
+    if (isEdit && review) {
+      let urls = [];
+      if (Array.isArray(review.imageUrls)) {
+        urls = review.imageUrls;
+      } else if (Array.isArray(review.images)) {
+        urls = review.images.map((img) => (typeof img === 'string' ? img : img.imageUrl));
+      } else if (review.imageUrl) {
+        urls = review.imageUrl.split(',').map((url) => url.trim()).filter(Boolean);
+      }
+
+      setExistingImages(urls);
+      
+      const initialPreviews = urls.map((url, idx) => ({
+        id: `existing-${idx}`,
+        src: url.startsWith('http') ? url : `http://localhost:8080${url}`,
+        originalUrl: url,
+        isExisting: true
+      }));
+      setPreviews(initialPreviews);
     }
   }, [isEdit, review]);
 
-  // 맛집 정보 없이 예외 접근 시 처리
-  if (!place) {
+  // 장소 정보가 없으면 예외 처리
+  const targetPlace = place || (review ? {
+    id: review.restaurantId,
+    place_name: review.restaurantName || '선택한 식당',
+    road_address_name: review.address || ''
+  } : null);
+
+  if (!targetPlace) {
     return (
       <ReviewLayout>
         <div css={s.container}>
@@ -43,35 +67,42 @@ export function ReviewWrite() {
     );
   }
 
-  // 별점 클릭 핸들러
   const handleStarClick = (selectedRating) => {
     setRating(selectedRating);
   };
 
-  // 이미지 선택 핸들러
+  // 이미지 추가 핸들러
   const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
+    const selectedFiles = Array.from(e.target.files);
 
-    if (images.length + files.length > 5) {
+    if (previews.length + selectedFiles.length > 5) {
       alert('사진은 최대 5장까지 첨부할 수 있습니다.');
       return;
     }
 
-    const newImages = [...images, ...files];
-    setImages(newImages);
+    setNewFiles((prev) => [...prev, ...selectedFiles]);
 
-    const newPreviews = files.map((file) => URL.createObjectURL(file));
-    setImagePreviews((prev) => [...prev, ...newPreviews]);
+    const newPreviewItems = selectedFiles.map((file, idx) => ({
+      id: `new-${Date.now()}-${idx}`,
+      src: URL.createObjectURL(file),
+      file: file,
+      isExisting: false
+    }));
+
+    setPreviews((prev) => [...prev, ...newPreviewItems]);
+    e.target.value = '';
   };
 
-  // 이미지 삭제 핸들러
-  const handleRemoveImage = (index) => {
-    // 기존에 있던 서버 이미지를 지운 경우와 새로 추가한 로컬 파일을 지운 경우 모두 고려
-    setImages(images.filter((_, i) => i !== index));
-    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
+  // 이미지 개별 삭제 핸들러
+  const handleRemoveImage = (targetItem) => {
+    if (targetItem.isExisting) {
+      setExistingImages((prev) => prev.filter((url) => url !== targetItem.originalUrl));
+    } else {
+      setNewFiles((prev) => prev.filter((f) => f !== targetItem.file));
+    }
+    setPreviews((prev) => prev.filter((p) => p.id !== targetItem.id));
   };
 
-  // 폼 제출 핸들러
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -80,41 +111,33 @@ export function ReviewWrite() {
       return;
     }
 
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      alert('로그인이 필요한 서비스입니다.');
-      navigate('/login');
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
       const formData = new FormData();
 
-      // Restaurant 자동 등록 및 Review 저장을 위한 데이터
       const reviewData = {
-        placeId: place.id ? parseInt(place.id, 10) : null, 
-        placeName: place.place_name || place.name || '',
-        address: place.road_address_name || place.address || '',
-        category: place.category_name || place.category || '',
-        phone: place.phone || '',
-        latitude: place.y ? parseFloat(place.y) : (place.latitude ? parseFloat(place.latitude) : null),
-        longitude: place.x ? parseFloat(place.x) : (place.longitude ? parseFloat(place.longitude) : null),
+        placeId: targetPlace.id ? Number(targetPlace.id) : null,
+        placeName: targetPlace.place_name || targetPlace.name || '',
+        address: targetPlace.road_address_name || targetPlace.address || '',
+        category: targetPlace.category_name || targetPlace.category || '',
+        phone: targetPlace.phone || '',
+        latitude: targetPlace.y ? parseFloat(targetPlace.y) : (targetPlace.latitude ? parseFloat(targetPlace.latitude) : null),
+        longitude: targetPlace.x ? parseFloat(targetPlace.x) : (targetPlace.longitude ? parseFloat(targetPlace.longitude) : null),
         rating: Number(rating),
         content: content,
+        keepImageUrls: existingImages
       };
 
-      formData.append(
-        'reviewDto',
-        new Blob([JSON.stringify(reviewData)], { type: 'application/json' })
-      );
+      // 💡 reviewDto를 JSON Blob으로 변환할 때 'reviewDto.json' 명칭을 추가해 전달
+      const jsonBlob = new Blob([JSON.stringify(reviewData)], { type: 'application/json' });
+      formData.append('reviewDto', jsonBlob, 'reviewDto.json');
 
-      images.forEach((image) => {
-        formData.append('images', image);
+      // 새로 추가된 이미지 파일 전송
+      newFiles.forEach((file) => {
+        formData.append('images', file);
       });
 
-      // ✏️ [분기 처리] 수정 모드(isEdit)일 때는 PUT 요청, 작성일 때는 POST 요청
       if (isEdit && review) {
         await api.put(`/api/reviews/${review.reviewId}`, formData);
         alert('리뷰가 성공적으로 수정되었습니다!');
@@ -136,14 +159,13 @@ export function ReviewWrite() {
     <ReviewLayout>
       <div css={s.container}>
         <div css={s.header}>
-          {/* ✏️ 수정 모드 여부에 맞춰 제목 표시 */}
           <h2>{isEdit ? '리뷰 수정' : '리뷰 작성'}</h2>
           <button type="button" css={s.closeBtn} onClick={() => navigate(-1)}>✕</button>
         </div>
 
         <div css={s.placeCard}>
-          <h3>{place.place_name || place.name}</h3>
-          <p>{place.road_address_name || place.address}</p>
+          <h3>{targetPlace.place_name || targetPlace.name}</h3>
+          <p>{targetPlace.road_address_name || targetPlace.address}</p>
         </div>
 
         <form onSubmit={handleSubmit} css={s.form}>
@@ -189,13 +211,13 @@ export function ReviewWrite() {
               </label>
 
               <div css={s.previewList}>
-                {imagePreviews.map((src, index) => (
-                  <div key={index} css={s.previewItem}>
-                    <img src={src} alt={`미리보기 ${index + 1}`} />
+                {previews.map((item) => (
+                  <div key={item.id} css={s.previewItem}>
+                    <img src={item.src} alt="리뷰 미리보기" />
                     <button
                       type="button"
                       css={s.removeBtn}
-                      onClick={() => handleRemoveImage(index)}
+                      onClick={() => handleRemoveImage(item)}
                     >
                       ✕
                     </button>
@@ -206,7 +228,6 @@ export function ReviewWrite() {
           </div>
 
           <button type="submit" css={s.submitBtn} disabled={isSubmitting}>
-            {/* ✏️ 수정 모드 여부에 맞춰 버튼 텍스트 변경 */}
             {isSubmitting ? '처리 중...' : isEdit ? '수정 완료' : '작성 완료'}
           </button>
         </form>

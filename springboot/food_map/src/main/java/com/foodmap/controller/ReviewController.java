@@ -27,7 +27,7 @@ public class ReviewController {
     public ResponseEntity<Void> createReview(
             @RequestPart("reviewDto") ReviewRequestDto dto,
             @RequestPart(value = "images", required = false) List<MultipartFile> images,
-            @AuthenticationPrincipal CustomUserDetails customUserDetails // 프로젝트에 맞는 UserDetails 구현체
+            @AuthenticationPrincipal CustomUserDetails customUserDetails
     ) {
         // 인증 객체에서 userId 추출 (CustomUserDetails 구현에 맞춰 id 가져오기)
         Long userId = customUserDetails.getUserId();

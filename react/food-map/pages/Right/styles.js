@@ -327,16 +327,76 @@ export const reviewAuthor = css`
   color: #333;
 `;
 
+
+// 이미지 다음 넘어가기
+
 export const reviewImageWrapper = css`
-  margin-top: 8px;
+  position: relative;
+  display: inline-block;
   width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
+  max-width: 300px;
+  margin-top: 8px;
 `;
 
 export const reviewImg = css`
   width: 100%;
-  max-height: 180px;
+  height: 200px;
   object-fit: cover;
-  display: block;
+  border-radius: 8px;
+`;
+
+// 다음(>) 버튼 스타일 (이미지 오른쪽 가운데 위치)[cite: 8]
+export const nextBtn = css`
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  &:hover {
+    background: rgba(0, 0, 0, 0.8);
+  }
+`;
+
+// 이전(<) 버튼 스타일
+export const prevBtn = css`
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  &:hover {
+    background: rgba(0, 0, 0, 0.8);
+  }
+`;
+
+// 사진 순서 표시 뱃지
+export const imageBadge = css`
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
 `;

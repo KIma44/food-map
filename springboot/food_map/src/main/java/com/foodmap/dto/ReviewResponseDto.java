@@ -1,10 +1,15 @@
 package com.foodmap.dto;
 
 import com.foodmap.entity.Review;
+import com.foodmap.entity.ReviewImage;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Getter
 @Builder
@@ -14,21 +19,29 @@ public class ReviewResponseDto {
 
     private Long reviewId;
     private Long userId;
-    private String userName; // 작성자 닉네임
+    private String userName;
     private String email;
-    private Double rating;
+    private Long restaurantId;
     private String content;
-    private String imageUrl;
+    private Double rating;
+    private List<String> images; // 여러 장의 이미지 URL 리스트
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-    public static ReviewResponseDto fromEntity(Review review, String userName,String email) {
+    public static ReviewResponseDto fromEntity(Review review, String userName, String email) {
         return ReviewResponseDto.builder()
                 .reviewId(review.getReviewId())
-                .userId(review.getUserId())
+                .userId(review.getUserId()) // getUser().getId() 에러 해결
                 .userName(userName)
                 .email(email)
-                .rating(review.getRating())
+                .restaurantId(review.getRestaurant().getRestaurantId())
                 .content(review.getContent())
-                .imageUrl(review.getImageUrl())
+                .rating(review.getRating())
+                .images(review.getImages().stream()
+                        .map(ReviewImage::getImageUrl)
+                        .collect(Collectors.toList()))
+                .createdAt(review.getCreatedAt())
+                .updatedAt(review.getUpdatedAt())
                 .build();
     }
 }
