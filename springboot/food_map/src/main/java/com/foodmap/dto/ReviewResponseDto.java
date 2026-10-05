@@ -27,6 +27,9 @@ public class ReviewResponseDto {
     private List<String> images; // 여러 장의 이미지 URL 리스트
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    // 조인을 통해 전달할 식당 정보
+    private String restaurantName;     // 예: "옥상만가"
+    private String restaurantCategory; // 예: "술집" (없으면 null 또는 "")
 
     public static ReviewResponseDto fromEntity(Review review, String userName, String email) {
         return ReviewResponseDto.builder()

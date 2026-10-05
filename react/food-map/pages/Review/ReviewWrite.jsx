@@ -25,6 +25,21 @@ export function ReviewWrite() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 대상 장소 정보 바인딩
+  const targetPlace = place || (review ? {
+    id: review.restaurantId,
+    place_name: review.restaurantName || '선택한 식당',
+    road_address_name: review.address || ''
+  } : null);
+
+  // 💡 장소 정보가 없을 때 흰 화면 방지 및 이전 페이지/메인으로 즉시 이탈 처리
+  useEffect(() => {
+    if (!targetPlace) {
+      alert('선택된 맛집 정보가 없습니다. 메인 페이지로 이동합니다.');
+      navigate('/', { replace: true });
+    }
+  }, [targetPlace, navigate]);
+
   // [수정 모드] 기존 등록된 이미지 미리보기 세팅
   useEffect(() => {
     if (isEdit && review) {
@@ -49,22 +64,9 @@ export function ReviewWrite() {
     }
   }, [isEdit, review]);
 
-  // 장소 정보가 없으면 예외 처리
-  const targetPlace = place || (review ? {
-    id: review.restaurantId,
-    place_name: review.restaurantName || '선택한 식당',
-    road_address_name: review.address || ''
-  } : null);
-
+  // targetPlace가 없으면 이동 처리 중 빈 화면 렌더링
   if (!targetPlace) {
-    return (
-      <ReviewLayout>
-        <div css={s.container}>
-          <p>선택된 맛집 정보가 없습니다.</p>
-          <button type="button" onClick={() => navigate('/')}>메인으로 돌아가기</button>
-        </div>
-      </ReviewLayout>
-    );
+    return null;
   }
 
   const handleStarClick = (selectedRating) => {
@@ -129,11 +131,9 @@ export function ReviewWrite() {
         keepImageUrls: existingImages
       };
 
-      // 💡 reviewDto를 JSON Blob으로 변환할 때 'reviewDto.json' 명칭을 추가해 전달
       const jsonBlob = new Blob([JSON.stringify(reviewData)], { type: 'application/json' });
       formData.append('reviewDto', jsonBlob, 'reviewDto.json');
 
-      // 새로 추가된 이미지 파일 전송
       newFiles.forEach((file) => {
         formData.append('images', file);
       });

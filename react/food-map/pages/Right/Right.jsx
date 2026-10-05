@@ -6,7 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import defaultProfileImg from '/profile/기본_프로필.png';
 import api from '../../api/api.js';
 
-// 📸 리뷰 이미지 슬라이더 컴포넌트
+import ReviewComment from '../Comments/ReviewComment.jsx';
+
+// 리뷰 이미지 슬라이더 컴포넌트
 function ReviewImageSlider({ images }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -73,13 +75,15 @@ export function Right({
   const [topReviews, setTopReviews] = useState([]);
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
 
+  // 💡 선택된 댓글 대상 리뷰 관리 상태
+  const [selectedReviewForComment, setSelectedReviewForComment] = useState(null);
+
   const token = localStorage.getItem('accessToken');
   const isUserLoggedIn = isLoggedIn || !!token;
 
   const userName = localStorage.getItem('userName') || '사용자';
   const currentUserEmail = (localStorage.getItem('userEmail') || '').trim().toLowerCase();
   
-  // 관리자 여부 확인 추가
   const currentUserRole = localStorage.getItem('userRole') || '';
   const isAdmin = currentUserRole === 'ROLE_ADMIN' || currentUserRole === 'ADMIN';
 
@@ -90,6 +94,9 @@ export function Right({
       : defaultProfileImg;
 
   useEffect(() => {
+    // 장소가 바뀔 때 댓글 화면 및 리뷰 초기화
+    setSelectedReviewForComment(null);
+
     if (!selectedPlace) {
       setTopReviews([]);
       return;
@@ -180,6 +187,16 @@ export function Right({
     }
   };
 
+  // 💬 댓글 작성 / 보기 창으로 이동 핸들러
+  const handleOpenComment = (review) => {
+    setSelectedReviewForComment(review);
+  };
+
+  // 🔙 댓글 목록에서 목록/상세 보기로 돌아가기 핸들러
+  const handleCloseComment = () => {
+    setSelectedReviewForComment(null);
+  };
+
   return (
     <RightLayout>
       <div css={s.container}>
@@ -229,7 +246,37 @@ export function Right({
         <hr css={s.divider} />
 
         <div css={s.contentSection}>
-          {selectedPlace ? (
+          {/* 💡 선택된 리뷰가 있으면 댓글 작성/보기 화면 표시 */}
+          {selectedReviewForComment ? (
+            <div css={s.selectedDetailCard}>
+              <button
+                type="button"
+                onClick={handleCloseComment}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#666',
+                  cursor: 'pointer',
+                  marginBottom: '12px',
+                  fontSize: '14px',
+                  padding: 0
+                }}
+              >
+                ← 베스트 리뷰 목록으로 돌아가기
+              </button>
+
+              {/* 댓글 작성 및 보기 컴포넌트 */}
+              <ReviewComment
+                review={selectedReviewForComment}
+                isOpen={!!selectedReviewForComment} 
+                onClose={handleCloseComment}
+                isUserLoggedIn={isUserLoggedIn}
+                isLoggedIn={isUserLoggedIn}
+                currentUserEmail={currentUserEmail}
+                isAdmin={isAdmin}
+              />
+            </div>
+          ) : selectedPlace ? (
             <div css={s.selectedDetailCard}>
               <h3>{selectedPlace.name}</h3>
               <p>📍 거리: {selectedPlace.distance}</p>
@@ -256,8 +303,8 @@ export function Right({
                         currentUserEmail !== '' &&
                         reviewEmail === currentUserEmail;
 
-                      // 작성자 본인 또는 관리자인 경우 삭제 허용
                       const canDeleteReview = isUserLoggedIn && (isMyReview || isAdmin);
+                      const categoryName = review.restaurantCategory || selectedPlace?.category;
 
                       return (
                         <div key={review.reviewId} css={s.reviewItem}>
@@ -289,9 +336,38 @@ export function Right({
                             )}
                           </div>
 
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '4px 0 8px 0' }}>
+                            <strong style={{ fontSize: '13px', color: '#333' }}>
+                              {review.restaurantName || selectedPlace?.name}
+                            </strong>
+                            {categoryName && (
+                              <span css={s.categoryTag}>
+                                {categoryName}
+                              </span>
+                            )}
+                          </div>
+
                           <p css={s.reviewContent}>{review.content}</p>
 
                           <ReviewImageSlider images={imageList} />
+
+                          {/* 💬 댓글 작성 / 보기 창으로 이동 버튼 */}
+                          <div style={{ marginTop: '10px', textAlign: 'right' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenComment(review)}
+                              style={{
+                                background: '#f0f0f0',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              💬 댓글 보기 / 작성 {review.commentCount ? `(${review.commentCount})` : ''}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
