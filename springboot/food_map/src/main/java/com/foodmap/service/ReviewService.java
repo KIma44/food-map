@@ -2,10 +2,7 @@ package com.foodmap.service;
 
 import com.foodmap.dto.ReviewRequestDto;
 import com.foodmap.dto.ReviewResponseDto;
-import com.foodmap.entity.Restaurant;
-import com.foodmap.entity.Review;
-import com.foodmap.entity.ReviewImage;
-import com.foodmap.entity.User;
+import com.foodmap.entity.*;
 import com.foodmap.repository.RestaurantRepository;
 import com.foodmap.repository.ReviewRepository;
 import com.foodmap.repository.UserRepository;
@@ -125,5 +122,28 @@ public class ReviewService {
                 }
             }
         }
+    }
+
+    // 리뷰 삭제 (관리자와 사용자만임)
+    @Transactional
+    public void deleteReview(Long userId, Long reviewId) {
+        // 1. 리뷰 존재 여부 확인
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 리뷰입니다. ID: " + reviewId));
+
+        // 2. 요청 유저 정보 조회
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다. ID: " + userId));
+
+        // 3. 작성자 본인 확인 또는 관리자(ADMIN) 권한 확인 (Enum 타입 직접 비교)
+        boolean isOwner = review.getUserId().equals(userId);
+        boolean isAdmin = user.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new IllegalStateException("리뷰를 삭제할 권한이 없습니다.");
+        }
+
+        // 4. 리뷰 삭제 (Cascade, orphanRemoval 설정에 의해 관련 ReviewImage도 함께 삭제됨)
+        reviewRepository.delete(review);
     }
 }

@@ -79,6 +79,7 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .name(user.getName())
                 .profile(user.getProfile()) // /uploads/profile/xxx.jpg 형태로 반환
+                .role(user.getRole().name())
                 .build();
     }
 }

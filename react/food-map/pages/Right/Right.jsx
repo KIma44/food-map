@@ -10,7 +10,6 @@ import api from '../../api/api.js';
 function ReviewImageSlider({ images }) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // 이미지가 없으면 렌더링하지 않음[cite: 8]
   if (!images || images.length === 0) return null;
 
   const handleNext = (e) => {
@@ -29,7 +28,6 @@ function ReviewImageSlider({ images }) {
 
   return (
     <div css={s.reviewImageWrapper}>
-      {/* 이전 버튼 (2장 이상이고 첫번째 사진이 아닐 때 혹은 무한 슬라이드) */}
       {images.length > 1 && currentIndex > 0 && (
         <button type="button" css={s.prevBtn} onClick={handlePrev}>
           ‹
@@ -45,14 +43,12 @@ function ReviewImageSlider({ images }) {
         }}
       />
 
-      {/* 2장 이상일 때만 '>' 다음 버튼 노출 */}
       {images.length > 1 && currentIndex < images.length - 1 && (
         <button type="button" css={s.nextBtn} onClick={handleNext}>
           ›
         </button>
       )}
 
-      {/* 인덱스 표시 (선택사항, 예: 1/3) */}
       {images.length > 1 && (
         <span css={s.imageBadge}>
           {currentIndex + 1} / {images.length}
@@ -82,6 +78,10 @@ export function Right({
 
   const userName = localStorage.getItem('userName') || '사용자';
   const currentUserEmail = (localStorage.getItem('userEmail') || '').trim().toLowerCase();
+  
+  // 관리자 여부 확인 추가
+  const currentUserRole = localStorage.getItem('userRole') || '';
+  const isAdmin = currentUserRole === 'ROLE_ADMIN' || currentUserRole === 'ADMIN';
 
   const rawProfile = localStorage.getItem('userProfile');
   const profileImageUrl =
@@ -133,6 +133,7 @@ export function Right({
     localStorage.removeItem('userId');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userProfile');
+    localStorage.removeItem('userRole');
 
     if (setIsLoggedIn) setIsLoggedIn(false);
 
@@ -242,7 +243,6 @@ export function Right({
                 ) : topReviews.length > 0 ? (
                   <div css={s.reviewList}>
                     {topReviews.map((review) => {
-                      // 💡 이미지가 단일 URL, 문자열(쉼표 구분) 또는 배열 형식일 경우 모두 배열로 변환
                       let imageList = [];
                       if (Array.isArray(review.images)) {
                         imageList = review.images.map((img) => typeof img === 'string' ? img : img.imageUrl);
@@ -256,35 +256,41 @@ export function Right({
                         currentUserEmail !== '' &&
                         reviewEmail === currentUserEmail;
 
+                      // 작성자 본인 또는 관리자인 경우 삭제 허용
+                      const canDeleteReview = isUserLoggedIn && (isMyReview || isAdmin);
+
                       return (
                         <div key={review.reviewId} css={s.reviewItem}>
                           <div css={s.reviewHeader}>
                             <span css={s.reviewAuthor}>{review.email}</span>
                             <span css={s.reviewRating}>★ {review.rating}</span>
 
-                            {isMyReview && (
+                            {(isMyReview || canDeleteReview) && (
                               <div css={s.myReviewActionBtns}>
-                                <button
-                                  type="button"
-                                  css={s.editBtn}
-                                  onClick={() => handleEditReview(review)}
-                                >
-                                  수정
-                                </button>
-                                <button
-                                  type="button"
-                                  css={s.deleteBtn}
-                                  onClick={() => handleDeleteReview(review.reviewId)}
-                                >
-                                  삭제
-                                </button>
+                                {isMyReview && (
+                                  <button
+                                    type="button"
+                                    css={s.editBtn}
+                                    onClick={() => handleEditReview(review)}
+                                  >
+                                    수정
+                                  </button>
+                                )}
+                                {canDeleteReview && (
+                                  <button
+                                    type="button"
+                                    css={s.deleteBtn}
+                                    onClick={() => handleDeleteReview(review.reviewId)}
+                                  >
+                                    삭제
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>
 
                           <p css={s.reviewContent}>{review.content}</p>
 
-                          {/* 📸 이미지 슬라이더 연동 */}
                           <ReviewImageSlider images={imageList} />
                         </div>
                       );

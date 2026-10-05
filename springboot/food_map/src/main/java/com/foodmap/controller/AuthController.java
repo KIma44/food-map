@@ -17,7 +17,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    // MediaType 지정 및 required = false 확인
+    // MediaType 지정 및 required = false 확인 회워가입
     @PostMapping(value = "/join", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<String> signup(
             @RequestPart("signupDto") SignupDto signupDto,
@@ -27,6 +27,7 @@ public class AuthController {
         return ResponseEntity.ok("회원가입 성공");
     }
 
+    // 로그인
     @PostMapping("/login")
     public ResponseEntity<TokenDto> login(@RequestBody LoginDto loginDto) {
         TokenDto tokenDto = authService.login(loginDto);

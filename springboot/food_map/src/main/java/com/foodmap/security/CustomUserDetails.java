@@ -1,24 +1,34 @@
 package com.foodmap.security;
 
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
+import java.util.Collections;
 
 public class CustomUserDetails implements UserDetails {
     private Long userId;
     private String email;
+    private String role;
 
-    public CustomUserDetails(Long userId, String email) {
+    public CustomUserDetails(Long userId, String email, String role) {
         this.userId = userId;
         this.email = email;
+        this.role = role;
     }
 
     public Long getUserId() {
         return userId;
     }
 
+    public String getRole() {
+    return role;
+}
+
     @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() { return null; }
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role));
+    }
     @Override
     public String getPassword() { return null; }
     @Override

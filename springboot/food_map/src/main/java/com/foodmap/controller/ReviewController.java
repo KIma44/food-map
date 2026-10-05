@@ -55,4 +55,22 @@ public class ReviewController {
         reviewService.updateReview(userId, reviewId, dto, images);
         return ResponseEntity.ok().build();
     }
+
+
+    // 리뷰 삭제 (관리자와 사용자)
+    @DeleteMapping("/{reviewId}")
+    public ResponseEntity<?> deleteReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails, // Security Context/Custom UserDetails 기준
+            @PathVariable Long reviewId
+    ) {
+        try {
+            Long userId = userDetails.getUserId(); // 로그인한 사용자 ID
+            reviewService.deleteReview(userId, reviewId);
+            return ResponseEntity.ok("리뷰가 성공적으로 삭제되었습니다.");
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
 }

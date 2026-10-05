@@ -74,7 +74,7 @@ public class JwtTokenProvider {
 
         Long userId = claims.get("userId", Long.class);
         String email = claims.getSubject();
-
-        return new CustomUserDetails(userId, email);
+        String role = claims.get("role", String.class);
+        return new CustomUserDetails(userId, email, role);
     }
 }
