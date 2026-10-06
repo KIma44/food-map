@@ -5,8 +5,12 @@ import Join from '../pages/Auth/Join/Join';
 import Login from '../pages/Auth/Login/Login';
 import ReviewWrite from '../pages/Review/ReviewWrite';
 import ReviewComment from '../pages/Comments/ReviewComment';
+import MyProfile from '../pages/MyProfile/MyProfile';
 import AuthRoute from './AuthRoute';
 import AdminRoute from './AdminRoute';
+
+// 새로 생성한 ProfileLayout import
+import ProfileLayout from '../Layout/ProfileLayout/profileLayout';
 
 export function AppRoutes({ isLoggedIn, setIsLoggedIn, isAdmin }) {
   return (
@@ -16,12 +20,17 @@ export function AppRoutes({ isLoggedIn, setIsLoggedIn, isAdmin }) {
       <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
       <Route path="/join" element={<Join />} />
 
-      {/* 댓글 단독 페이지 경로가 필요한 경우 */}
+      {/* 댓글 단독 페이지 */}
       <Route path="/reviews/:reviewId/comments" element={<ReviewComment isUserLoggedIn={isLoggedIn} />} />
 
-      {/* 로그인한 사용자만 접근 가능한 페이지 */}
+      {/* 1. 로그인한 사용자만 접근 가능한 보호 라우트 */}
       <Route element={<AuthRoute isLoggedIn={isLoggedIn} />}>
         <Route path="/review/write" element={<ReviewWrite />} />
+        
+        {/* 2. ProfileLayout이 적용되는 라우트 그룹 */}
+        <Route element={<ProfileLayout />}>
+          <Route path="/myprofile" element={<MyProfile />} />
+        </Route>
       </Route>
 
       {/* 관리자만 접근 가능한 페이지 */}
