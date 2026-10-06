@@ -55,4 +55,17 @@ public class ReviewCommentController {
         commentService.deleteComment(commentId, userEmail, isAdmin);
         return ResponseEntity.noContent().build();
     }
+
+    // 댓글 수정 (PUT /api/comments/{commentId})
+    @PutMapping("/comments/{commentId}")
+    public ResponseEntity<ReviewCommentDto.Response> updateComment(
+            @PathVariable Long commentId,
+            @RequestBody ReviewCommentDto.Request request,
+            Authentication authentication) {
+
+        String userEmail = authentication.getName();
+        ReviewCommentDto.Response response = commentService.updateComment(commentId, userEmail, request);
+        return ResponseEntity.ok(response);
+    }
+
 }

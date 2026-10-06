@@ -8,7 +8,10 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
   const [commentInput, setCommentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // reviewId 키 명칭 예외 처리 (reviewId 또는 id)
+  // 수정 관련 상태
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editInput, setEditInput] = useState('');
+
   const reviewId = review?.reviewId || review?.id;
 
   useEffect(() => {
@@ -17,7 +20,6 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
     }
   }, [isOpen, reviewId]);
 
-  // 댓글 목록 불러오기
   const fetchComments = async () => {
     if (!reviewId) return;
     setIsLoading(true);
@@ -32,7 +34,6 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
     }
   };
 
-  // 댓글 등록
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!commentInput.trim()) return;
@@ -43,14 +44,44 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
       });
       alert('댓글이 등록되었습니다.');
       setCommentInput('');
-      fetchComments(); // 작성 후 전체 목록 동기화
+      fetchComments();
     } catch (error) {
       console.error('댓글 등록 실패:', error);
       alert('댓글 등록에 실패했습니다.');
     }
   };
 
-  // 댓글 삭제
+  // 수정 모드 진입
+  const handleStartEdit = (comment) => {
+    setEditingCommentId(comment.commentId);
+    setEditInput(comment.content);
+  };
+
+  // 수정 취소
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditInput('');
+  };
+
+  // 댓글 수정 요청
+  const handleUpdateComment = async (commentId) => {
+    if (!editInput.trim()) return;
+
+    try {
+      const response = await api.put(`/api/comments/${commentId}`, {
+        content: editInput.trim()
+      });
+      setComments((prev) =>
+        prev.map((c) => (c.commentId === commentId ? response.data : c))
+      );
+      setEditingCommentId(null);
+      setEditInput('');
+    } catch (error) {
+      console.error('댓글 수정 실패:', error);
+      alert('댓글 수정에 실패했습니다.');
+    }
+  };
+
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
 
@@ -63,7 +94,6 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
     }
   };
 
-  // 닫기 핸들러 (onClose가 함수인 경우에만 안전하게 호출)
   const handleClose = () => {
     if (typeof onClose === 'function') {
       onClose();
@@ -75,27 +105,24 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
   return (
     <div css={s.overlay} onClick={handleClose}>
       <div css={s.modal} onClick={(e) => e.stopPropagation()}>
-        {/* 모달 헤더 */}
         <div css={s.header}>
           <h3>💬 댓글 ({comments.length})</h3>
           <button type="button" onClick={handleClose} css={s.closeBtn}>✕</button>
         </div>
 
-        {/* 리뷰 요약 정보 */}
         <div css={s.reviewSummary}>
           <span><strong>작성자:</strong> {review.email || review.userName || review.userEmail}</span>
           <p>{review.content}</p>
         </div>
 
-        {/* 댓글 목록 영역 */}
         <div css={s.commentList}>
           {isLoading ? (
             <p css={s.infoText}>댓글을 불러오는 중...</p>
           ) : comments.length > 0 ? (
             comments.map((comment) => {
-              // 작성자 본인 여부 확인
               const isOwner = currentUserEmail && comment.userEmail === currentUserEmail;
               const canDelete = isOwner || isAdmin;
+              const isEditing = editingCommentId === comment.commentId;
 
               return (
                 <div key={comment.commentId} css={s.commentItem}>
@@ -103,17 +130,54 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
                     <div css={s.commentAuthor}>
                       {comment.userName ? `${comment.userName} (${comment.userEmail})` : comment.userEmail}
                     </div>
-                    {canDelete && (
+                    <div css={{ display: 'flex', gap: '8px' }}>
+                      {isOwner && !isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(comment)}
+                          css={{ background: 'none', border: 'none', color: '#1890ff', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          수정
+                        </button>
+                      )}
+                      {canDelete && !isEditing && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteComment(comment.commentId)}
+                          css={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isEditing ? (
+                    <div css={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        value={editInput}
+                        onChange={(e) => setEditInput(e.target.value)}
+                        css={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                      />
                       <button
                         type="button"
-                        onClick={() => handleDeleteComment(comment.commentId)}
-                        css={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer', fontSize: '12px' }}
+                        onClick={() => handleUpdateComment(comment.commentId)}
+                        css={{ padding: '4px 12px', background: '#1890ff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                       >
-                        삭제
+                        저장
                       </button>
-                    )}
-                  </div>
-                  <div css={s.commentContent}>{comment.content}</div>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        css={{ padding: '4px 12px', background: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        취소
+                      </button>
+                    </div>
+                  ) : (
+                    <div css={s.commentContent}>{comment.content}</div>
+                  )}
                 </div>
               );
             })
@@ -122,7 +186,6 @@ function ReviewComment({ review, isOpen, onClose, isUserLoggedIn, currentUserEma
           )}
         </div>
 
-        {/* 댓글 작성 영역 */}
         {isUserLoggedIn ? (
           <form onSubmit={handleSubmitComment} css={s.form}>
             <input

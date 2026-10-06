@@ -39,4 +39,9 @@ public class ReviewComment {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // 댓글 수정 메서드 추가
+    public void updateContent(String content) {
+        this.content = content;
+    }
 }

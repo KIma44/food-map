@@ -351,18 +351,22 @@ export function Right({
 
                           <ReviewImageSlider images={imageList} />
 
-                          {/* 💬 댓글 작성 / 보기 창으로 이동 버튼 */}
+                          {/* 댓글 작성 / 보기 창으로 이동 버튼 */}
                           <div style={{ marginTop: '10px', textAlign: 'right' }}>
                             <button
                               type="button"
                               onClick={() => handleOpenComment(review)}
                               style={{
-                                background: '#f0f0f0',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                padding: '4px 8px',
+                                background: '#ffffff',
+                                border: '1px solid #ffdcd0',
+                                borderRadius: '8px',
+                                padding: '6px 12px',
                                 fontSize: '12px',
-                                cursor: 'pointer'
+                                color: '#ff6b35',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 4px rgba(255, 107, 53, 0.08)',
+                                transition: 'all 0.2s ease'
                               }}
                             >
                               💬 댓글 보기 / 작성 {review.commentCount ? `(${review.commentCount})` : ''}

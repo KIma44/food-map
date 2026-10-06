@@ -11,6 +11,9 @@ export function Main() {
   const [mapInstance, setMapInstance] = useState(null);
   const [placeList, setPlaceList] = useState([]);
   
+  // 지도 부모 컨테이너 크기 변화 감지용 Ref
+  const mapWrapperRef = useRef(null);
+
   // 기본 사용자 위치 (울산/양산 지역 기본값)
   const [userLocation, setUserLocation] = useState({ lat: 35.4072, lng: 129.1558 });
 
@@ -21,6 +24,23 @@ export function Main() {
   useEffect(() => {
     userLocationRef.current = userLocation;
   }, [userLocation]);
+
+  // 💡 사이드바 당기기 등 크기 변경 시 지도를 자동으로 맞추는 ResizeObserver
+  useEffect(() => {
+    if (!mapInstance || !mapWrapperRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      const center = mapInstance.getCenter(); // 현재 지도 중심좌표 보존
+      mapInstance.relayout();                 // 지도 레이아웃 재계산 및 렌더링
+      mapInstance.setCenter(center);          // 중심점 유지
+    });
+
+    resizeObserver.observe(mapWrapperRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [mapInstance]);
 
   // 음식점 마커 전체 삭제
   const clearMarkers = () => {
@@ -87,7 +107,6 @@ export function Main() {
       'FD6',
       (data, status) => {
         if (status === kakao.maps.services.Status.OK) {
-          // 최대 10개 추출
           const limitedData = data.slice(0, 10);
 
           const realPlaces = limitedData.map((place) => {
@@ -135,7 +154,6 @@ export function Main() {
     const { kakao } = window;
     const ps = new kakao.maps.services.Places();
 
-    // 현재 지도 중심좌표 기준으로 키워드 검색
     const center = mapInstance.getCenter();
 
     ps.keywordSearch(
@@ -170,7 +188,6 @@ export function Main() {
           setPlaceList(searchResults);
           renderMarkers(mapInstance, searchResults);
 
-          // 첫 번째 검색 결과 위치로 지도 이동
           if (searchResults.length > 0) {
             const firstPlace = searchResults[0];
             const moveLatLng = new kakao.maps.LatLng(firstPlace.lat, firstPlace.lng);
@@ -272,7 +289,9 @@ export function Main() {
         />
       }
     >
-      <div id="map" css={s.mapContainer} />
+      <div ref={mapWrapperRef} style={{ width: '100%', height: '100%' }}>
+        <div id="map" css={s.mapContainer} />
+      </div>
     </MainLayout>
   );
 }

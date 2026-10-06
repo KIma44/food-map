@@ -1,7 +1,8 @@
 import { css } from '@emotion/react';
 
 export const container = css`
-  width: 380px;
+  width: 100%;
+  height: 100%;
   border-left: 1px solid #ccc;
   padding: 16px;
   overflow-y: auto;

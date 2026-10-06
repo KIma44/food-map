@@ -69,4 +69,22 @@ public class ReviewCommentService {
 
         commentRepository.delete(comment);
     }
+
+    // 댓글 수정
+    @Transactional
+    public ReviewCommentDto.Response updateComment(Long commentId, String userEmail, ReviewCommentDto.Request request) {
+        ReviewComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 댓글입니다. ID: " + commentId));
+
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다. email: " + userEmail));
+
+        if (!comment.getUserId().equals(user.getUserId())) {
+            throw new IllegalStateException("댓글 수정 권한이 없습니다.");
+        }
+
+        comment.updateContent(request.getContent());
+
+        return ReviewCommentDto.Response.fromEntity(comment, user.getEmail(), user.getName());
+    }
 }
