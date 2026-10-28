@@ -67,6 +67,10 @@ const MyProfile = () => {
           }).filter(item => item.allergyName);
 
           setSelectedAllergies(formattedAllergies);
+
+          // 💡 초기 로딩 시에도 내 알레르기 목록을 localStorage에 저장해둡니다.
+          const initialAllergyNames = formattedAllergies.map(a => a.allergyName);
+          localStorage.setItem('userAllergies', JSON.stringify(initialAllergyNames));
         }
       } catch (error) {
         console.error('내 정보 조회 실패:', error);
@@ -136,20 +140,22 @@ const MyProfile = () => {
       if (updatedUser.name) localStorage.setItem('userName', updatedUser.name);
       if (updatedUser.profile) localStorage.setItem('userProfile', updatedUser.profile);
 
-      //  저장된 최신 알레르기 목록을 localStorage('userAllergies')에 즉시 갱신
-      if (updatedUser.allergies && Array.isArray(updatedUser.allergies)) {
-        const allergyNames = updatedUser.allergies.map(item => 
+      // 💡 저장할 알레르기 이름 리스트를 추출합니다.
+      let allergyNames = [];
+      if (updatedUser && updatedUser.allergies && Array.isArray(updatedUser.allergies)) {
+        allergyNames = updatedUser.allergies.map(item => 
           typeof item === 'object' && item !== null ? item.allergyName : item
         ).filter(Boolean);
-        
-        localStorage.setItem('userAllergies', JSON.stringify(allergyNames));
       } else {
-        // 만약 응답에 allergies가 없다면 현재 선택된 목록을 직접 저장
-        const allergyNames = selectedAllergies.map(item => item.allergyName);
-        localStorage.setItem('userAllergies', JSON.stringify(allergyNames));
+        allergyNames = selectedAllergies.map(item => item.allergyName).filter(Boolean);
       }
 
+      // 🌟 최신 알레르기 목록을 localStorage('userAllergies')에 갱신
+      localStorage.setItem('userAllergies', JSON.stringify(allergyNames));
+
+      // 🌟 메인 화면(Right.jsx)으로 알레르기 변경 이벤트 전파
       window.dispatchEvent(new Event('userProfileUpdated'));
+
       alert('프로필이 성공적으로 수정되었습니다.');
       
       navigate(-1);

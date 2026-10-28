@@ -3,6 +3,7 @@ package com.foodmap.controller;
 import com.foodmap.dto.AiResultDto;
 import com.foodmap.dto.ReviewRequestDto;
 import com.foodmap.dto.ReviewResponseDto;
+import com.foodmap.entity.Review;
 import com.foodmap.security.CustomUserDetails;
 import com.foodmap.service.ReviewService;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reviews")
@@ -37,10 +39,14 @@ public class ReviewController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    // [베스트 리뷰 상위 3개 조회] - 로그인 없이 누구나 가능
+    // 베스트 리뷰 상위 3개 조회 - 로그인한 유저는 좋아요 상태 포함, 비회원은 false로 조회
     @GetMapping("/top3")
-    public ResponseEntity<List<ReviewResponseDto>> getTop3Reviews(@RequestParam("restaurantId") Long restaurantId) {
-        List<ReviewResponseDto> topReviews = reviewService.getTop3Reviews(restaurantId);
+    public ResponseEntity<List<ReviewResponseDto>> getTop3Reviews(
+            @RequestParam("restaurantId") Long restaurantId,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails
+    ) {
+        Long currentUserId = (customUserDetails != null) ? customUserDetails.getUserId() : null;
+        List<ReviewResponseDto> topReviews = reviewService.getTop3Reviews(restaurantId, currentUserId);
         return ResponseEntity.ok(topReviews);
     }
 
@@ -83,5 +89,33 @@ public class ReviewController {
 
         reviewService.updateAiAnalysisResult(reviewId, dto.getAiAnalysis());
         return ResponseEntity.ok().build();
+    }
+
+    // [좋아요 추가/취소 토글]
+    @PostMapping("/{reviewId}/like")
+    public ResponseEntity<?> toggleLike(
+            @PathVariable("reviewId") Long reviewId,
+            @AuthenticationPrincipal CustomUserDetails customUserDetails
+    ) {
+        try {
+            Long userId = customUserDetails.getUserId();
+            Map<String, Object> result = reviewService.toggleLike(reviewId, userId);
+            return ResponseEntity.ok(result);
+        } catch (IllegalStateException e) {
+            // 본인 글 좋아요 시도 등 예외 발생 시 400 Bad Request 또는 403 Forbidden 반환
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+     // 마이페이지 상위 3개 리뷰 조회
+    @GetMapping("/mypage/top3")
+    public ResponseEntity<List<Review>> getMyTopReviews(
+            @AuthenticationPrincipal CustomUserDetails customUserDetails
+    ) {
+        Long userId = customUserDetails.getUserId();
+        List<Review> topReviews = reviewService.getMyTopReviews(userId);
+        return ResponseEntity.ok(topReviews);
     }
 }

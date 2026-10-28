@@ -19,7 +19,7 @@ const parseAiAnalysis = (text) => {
   // 2. 알레르기 위험도 및 원재료 추출 패턴 대응
   const allergyMatch = text.match(/알레르기\s*위험도[:\s]*(?:\[)?\s*(안전|주의|위험)\s*(?:\])?(?:\s*\((.*?)\)|\s*(.*))?/);
   
-  // 3. AI 분석된 주요 성분 추출 (새로운 프롬프트 대응)
+  // 3. AI 분석된 주요 성분 추출
   const ingredientMatch = text.match(/포함된\s*주요\s*성분.*?[:\]]\s*(.*?)(?:\n|$)/);
 
   const koreanLevel = koreanSpicyMatch ? parseInt(koreanSpicyMatch[1], 10) : 0;
@@ -104,6 +104,11 @@ export function Right({
   // 💡 선택된 댓글 대상 리뷰 관리 상태
   const [selectedReviewForComment, setSelectedReviewForComment] = useState(null);
 
+  // 💡 마이페이지에서 수정된 알레르기 실시간 반영을 위한 상태 관리 변수
+  const [userAllergies, setUserAllergies] = useState(() => {
+    return JSON.parse(localStorage.getItem('userAllergies') || '[]');
+  });
+
   const token = localStorage.getItem('accessToken');
   const isUserLoggedIn = isLoggedIn || !!token;
 
@@ -132,7 +137,22 @@ export function Right({
       const response = await api.get('/api/reviews/top3', {
         params: { restaurantId }
       });
-      setTopReviews(response.data || []);
+      
+      const fetchedReviews = response.data || [];
+
+      setTopReviews((prevReviews) => {
+        return fetchedReviews.map((newRev) => {
+          const oldRev = prevReviews.find((p) => p.reviewId === newRev.reviewId);
+          // 백엔드에서 보내준 liked / isLiked 값을 최우선 반영
+          const backendIsLiked = newRev.isLiked !== undefined ? newRev.isLiked : newRev.liked;
+          
+          return {
+            ...newRev,
+            isLiked: backendIsLiked !== undefined ? backendIsLiked : (oldRev ? oldRev.isLiked : false),
+            likeCount: newRev.likeCount !== undefined ? newRev.likeCount : (oldRev ? oldRev.likeCount : 0)
+          };
+        });
+      });
     } catch (error) {
       console.error('상위 리뷰 목록 조회 실패:', error);
       if (!isPolling) setTopReviews([]);
@@ -145,6 +165,20 @@ export function Right({
     // 장소가 바뀔 때 댓글 화면 및 리뷰 초기화
     setSelectedReviewForComment(null);
     fetchTopReviews();
+  }, [selectedPlace]);
+
+  // 🚀 🌟 마이페이지에서 알레르기/프로필 수정 이벤트(userProfileUpdated) 감지 시 자동 갱신
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      const updatedAllergies = JSON.parse(localStorage.getItem('userAllergies') || '[]');
+      setUserAllergies(updatedAllergies);
+      fetchTopReviews(true); // 실시간으로 알레르기 판정 리렌더링
+    };
+
+    window.addEventListener('userProfileUpdated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('userProfileUpdated', handleProfileUpdate);
+    };
   }, [selectedPlace]);
 
   // 🚀 2️⃣ 실시간 폴링(Polling) 적용: "AI 분석 중입니다..." 상태인 리뷰가 존재하면 3초마다 자동 갱신
@@ -182,7 +216,7 @@ export function Right({
     localStorage.removeItem('userEmail');
     localStorage.removeItem('userProfile');
     localStorage.removeItem('userRole');
-    localStorage.removeItem('userAllergies'); // 🚀 로그아웃 시 계정 맞춤 알레르기 정보도 함께 초기화
+    localStorage.removeItem('userAllergies'); // 로그아웃 시 계정 맞춤 알레르기 정보 초기화
 
     if (setIsLoggedIn) setIsLoggedIn(false);
 
@@ -226,6 +260,47 @@ export function Right({
     } catch (error) {
       console.error('리뷰 삭제 실패:', error);
       alert('리뷰 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 💖 좋아요 토글 핸들러 (본인 리뷰 사전 차단으로 400 에러 콘솔 발생 원천 차단)
+  const handleToggleLike = async (review) => {
+    if (!isUserLoggedIn) {
+      alert('좋아요 기능은 로그인 후 이용할 수 있습니다.');
+      navigate('/login');
+      return;
+    }
+
+    // 💡 본인이 작성한 리뷰인지 프론트에서 사전 검사하여 API 호출 차단
+    const reviewEmail = (review.email || '').trim().toLowerCase();
+    const isMyReview = currentUserEmail !== '' && reviewEmail === currentUserEmail;
+
+    if (isMyReview) {
+      alert('자신이 작성한 리뷰에는 좋아요를 누를 수 없습니다.');
+      return;
+    }
+
+    try {
+      const response = await api.post(`/api/reviews/${review.reviewId}/like`);
+      
+      setTopReviews((prevReviews) =>
+        prevReviews.map((item) =>
+          item.reviewId === review.reviewId
+            ? {
+                ...item,
+                likeCount: response.data.likeCount,
+                isLiked: response.data.isLiked
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error('좋아요 처리 실패:', error);
+      if (error.response && error.response.data) {
+        alert(error.response.data);
+      } else {
+        alert('좋아요 처리 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -288,7 +363,7 @@ export function Right({
         <hr css={s.divider} />
 
         <div css={s.contentSection}>
-          {/* 💡 선택된 리뷰가 있으면 댓글 작성/보기 화면 표시 */}
+          {/* 선택된 리뷰가 있으면 댓글 작성/보기 화면 표시 */}
           {selectedReviewForComment ? (
             <div css={s.selectedDetailCard}>
               <button
@@ -352,7 +427,33 @@ export function Right({
                         <div key={review.reviewId} css={s.reviewItem}>
                           <div css={s.reviewHeader}>
                             <span css={s.reviewAuthor}>{review.email}</span>
-                            <span css={s.reviewRating}>★ {review.rating}</span>
+                            
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {/* 💖 좋아요 버튼 및 실시간 카운트 */}
+                              <button
+                                type="button"
+                                css={s.likeButton ? s.likeButton(review.isLiked) : undefined}
+                                onClick={() => handleToggleLike(review)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '13px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  color: review.isLiked ? '#ff4757' : '#666',
+                                  fontWeight: '600',
+                                  padding: '4px 6px',
+                                  borderRadius: '6px',
+                                  transition: 'background 0.2s'
+                                }}
+                              >
+                                {review.isLiked ? '❤️' : '🤍'} <span>{review.likeCount || 0}</span>
+                              </button>
+
+                              <span css={s.reviewRating}>★ {review.rating}</span>
+                            </div>
 
                             {(isMyReview || canDeleteReview) && (
                               <div css={s.myReviewActionBtns}>
@@ -410,13 +511,12 @@ export function Right({
                                     return <div css={s.aiAnalysisText}>{review.aiAnalysis}</div>;
                                   }
 
-                                  // 🚀 로그인한 계정의 알레르기 목록과 실시간 대조 비교
+                                  // 🚀 최신 userAllergies 상태와 실시간 비교 대조
                                   let allergyColor = '#5cb85c';
                                   let allergyBadgeText = '🟢 안전 (포함 성분 없음)';
 
                                   if (isUserLoggedIn) {
-                                    const myAllergies = JSON.parse(localStorage.getItem('userAllergies') || '[]');
-                                    const matchedAllergy = myAllergies.find(allergy => {
+                                    const matchedAllergy = userAllergies.find(allergy => {
                                       const target = allergy.toLowerCase();
                                       return (
                                         (parsed.ingredientsText && parsed.ingredientsText.toLowerCase().includes(target)) ||
@@ -525,7 +625,7 @@ export function Right({
           <h4 css={s.sectionTitle}>지도 화면 기준 주변 맛집</h4>
           <div css={s.placeList}>
             {placeList.length > 0 ? (
-              placeList.map((place) => (
+              placeList.placeList?.map((place) => null) || placeList.map((place) => (
                 <div
                   key={place.id}
                   css={s.placeCard}

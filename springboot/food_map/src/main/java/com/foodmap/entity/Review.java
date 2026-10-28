@@ -73,4 +73,20 @@ public class Review {
     public void updateAiAnalysis(String aiAnalysis) {
         this.aiAnalysis = aiAnalysis;
     }
+
+    // 좋아요 개수 추가
+    @Column(name = "like_count", nullable = false)
+    @Builder.Default
+    private Integer likeCount = 0;
+
+    // 좋아요 개수 증가/감소 메서드
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
+    }
 }

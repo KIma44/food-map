@@ -561,3 +561,22 @@ export const allergyReasonText = css`
   width: 100%;
   margin-top: 2px;
 `;
+
+// 좋아요 스타일
+// styles.js 예시 추가
+export const likeButton = (isLiked) => css`
+  background: none;
+  border: none;
+  cursor: pointer;
+  fontSize: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: ${isLiked ? '#ff4757' : '#888'};
+  font-weight: 600;
+  transition: all 0.2s ease;
+
+  &:hover {
+    opacity: 0.8;
+  }
+`;

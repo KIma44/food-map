@@ -31,10 +31,13 @@ public class ReviewResponseDto {
     private String restaurantName;     // 예: "옥상만가"
     private String restaurantCategory; // 예: "술집" (없으면 null 또는 "")
 
+    private boolean isLiked; // 내가 좋아요를 눌렀는지 여부
+    private int likeCount;   // 총 좋아요 수
+
     // AI 분석 결과
     private String aiAnalysis;
 
-    public static ReviewResponseDto fromEntity(Review review, String userName, String email) {
+    public static ReviewResponseDto fromEntity(Review review, String userName, String email, boolean isLiked) {
         return ReviewResponseDto.builder()
                 .reviewId(review.getReviewId())
                 .userId(review.getUserId()) // getUser().getId() 에러 해결
@@ -50,6 +53,8 @@ public class ReviewResponseDto {
                 .updatedAt(review.getUpdatedAt())
                 .restaurantName(review.getRestaurant().getName())       // 식당 이름도 필요하다면 여기서 함께 매핑 확인
                 .restaurantCategory(review.getRestaurant().getCategory()) // 카테고리도 함께 매핑 확인
+                .likeCount(review.getLikeCount()) // 💡 엔티티에 있는 likeCount 매핑
+                .isLiked(isLiked)
                 .aiAnalysis(review.getAiAnalysis())
                 .build();
     }

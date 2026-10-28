@@ -3,10 +3,7 @@ package com.foodmap.service;
 import com.foodmap.dto.ReviewRequestDto;
 import com.foodmap.dto.ReviewResponseDto;
 import com.foodmap.entity.*;
-import com.foodmap.repository.RestaurantRepository;
-import com.foodmap.repository.ReviewRepository;
-import com.foodmap.repository.UserRepository;
-import com.foodmap.repository.UserAllergyRepository;
+import com.foodmap.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,10 +24,11 @@ public class ReviewService {
     private final UserRepository userRepository;
     private final UserAllergyRepository userAllergyRepository;
     private final AiService aiService;
+    private final ReviewLikeRepository  reviewLikeRepository;
 
     @Transactional
     public void createReview(Long userId, ReviewRequestDto dto, List<MultipartFile> images) {
-        // 🚀 1. 파일 저장(fileService)보다 무조건 먼저, 톰캣 임시 파일이 사라지기 전에 바이트를 메모리에 안전하게 백업합니다.
+        // . 파일 저장(fileService)보다 무조건 먼저, 톰캣 임시 파일이 사라지기 전에 바이트를 메모리에 안전하게 백업합니다.
         List<AiService.ImageDataDto> preparedImages = new ArrayList<>();
         if (images != null && !images.isEmpty()) {
             for (MultipartFile file : images) {
@@ -99,14 +98,23 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponseDto> getTop3Reviews(Long restaurantId) {
+    public List<ReviewResponseDto> getTop3Reviews(Long restaurantId, Long currentUserId) {
         List<Review> topReviews = reviewRepository.findTop3ByRestaurant_RestaurantIdOrderByRatingDesc(restaurantId);
+
         return topReviews.stream()
                 .map(review -> {
                     User user = userRepository.findById(review.getUserId()).orElse(null);
                     String userName = (user != null) ? user.getName() : "회원";
                     String email = (user != null) ? user.getEmail() : "";
-                    return ReviewResponseDto.fromEntity(review, userName, email);
+
+                    // 💡 내가 이 리뷰에 좋아요를 눌렀는지 DB에서 확인
+                    boolean isLiked = false;
+                    if (currentUserId != null) {
+                        isLiked = reviewLikeRepository.existsByUserIdAndReviewId(currentUserId, review.getReviewId());
+                    }
+
+                    // 💡 DTO 생성 시 isLiked와 likeCount가 함께 담기도록 전달
+                    return ReviewResponseDto.fromEntity(review, userName, email, isLiked);
                 })
                 .collect(Collectors.toList());
     }
@@ -121,7 +129,7 @@ public class ReviewService {
             throw new IllegalStateException("본인이 작성한 리뷰만 수정할 수 있습니다.");
         }
 
-        // 🚀 1. 수정 시에도 파일 저장 전 가장 먼저 바이트를 메모리에 백업합니다.
+        // 수정 시에도 파일 저장 전 가장 먼저 바이트를 메모리에 백업합니다.
         List<AiService.ImageDataDto> preparedImages = new ArrayList<>();
         if (images != null && !images.isEmpty()) {
             for (MultipartFile file : images) {
@@ -191,5 +199,50 @@ public class ReviewService {
         }
 
         reviewRepository.delete(review);
+    }
+
+
+     // 좋아요 추가/취소 토글 (본인 글 좋아요 방지 포함)
+    @Transactional
+    public Map<String, Object> toggleLike(Long reviewId, Long userId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 리뷰입니다. ID: " + reviewId));
+
+        // 본인이 작성한 리뷰인지 확인 (셀프 좋아요 방지)
+        if (review.getUserId().equals(userId)) {
+            throw new IllegalStateException("자신이 작성한 리뷰에는 좋아요를 누를 수 없습니다.");
+        }
+
+        boolean isLiked;
+        java.util.Optional<ReviewLike> existingLike = reviewLikeRepository.findByUserIdAndReviewId(userId, reviewId);
+
+        if (existingLike.isPresent()) {
+            // 이미 좋아요를 눌렀다면 취소 (-1)
+            reviewLikeRepository.delete(existingLike.get());
+            review.decreaseLikeCount();
+            isLiked = false;
+        } else {
+            // 처음 누른다면 추가 (+1)
+            ReviewLike newLike = ReviewLike.builder()
+                    .userId(userId)
+                    .reviewId(reviewId)
+                    .build();
+            reviewLikeRepository.save(newLike);
+            review.increaseLikeCount();
+            isLiked = true;
+        }
+
+        reviewRepository.save(review);
+
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("likeCount", review.getLikeCount());
+        response.put("isLiked", isLiked);
+        return response;
+    }
+
+    // 마이페이지용: 내가 작성한 리뷰 중 좋아요가 가장 많은 상위 3개 조회
+    @Transactional(readOnly = true)
+    public List<Review> getMyTopReviews(Long userId) {
+        return reviewRepository.findTop3ByUserIdOrderByLikeCountDescCreatedAtDesc(userId);
     }
 }
