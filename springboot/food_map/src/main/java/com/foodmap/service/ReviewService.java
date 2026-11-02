@@ -1,0 +1,259 @@
+package com.foodmap.service;
+
+import com.foodmap.dto.ReviewRequestDto;
+import com.foodmap.dto.ReviewResponseDto;
+import com.foodmap.entity.*;
+import com.foodmap.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class ReviewService {
+
+    private final RestaurantRepository restaurantRepository;
+    private final ReviewRepository reviewRepository;
+    private final FileService fileService;
+    private final UserRepository userRepository;
+    private final UserAllergyRepository userAllergyRepository;
+    private final AiService aiService;
+    private final ReviewLikeRepository  reviewLikeRepository;
+
+    @Transactional
+    public void createReview(Long userId, ReviewRequestDto dto, List<MultipartFile> images) {
+        // . 파일 저장(fileService)보다 무조건 먼저, 톰캣 임시 파일이 사라지기 전에 바이트를 메모리에 안전하게 백업합니다.
+        List<AiService.ImageDataDto> preparedImages = new ArrayList<>();
+        if (images != null && !images.isEmpty()) {
+            for (MultipartFile file : images) {
+                if (file != null && !file.isEmpty()) {
+                    try {
+                        preparedImages.add(new AiService.ImageDataDto(
+                                file.getOriginalFilename(),
+                                file.getBytes()
+                        ));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        // 2. 유저 알레르기 조회
+        List<UserAllergy> allergyList = userAllergyRepository.findByUser_UserId(userId);
+        String userAllergies = allergyList.stream()
+                .map(UserAllergy::getAllergyName)
+                .collect(Collectors.joining(", "));
+        if (userAllergies.isEmpty()) userAllergies = "등록된 알레르기 없음";
+
+        // 3. 식당 조회 및 Upsert
+        Restaurant restaurant = restaurantRepository.findByRestaurantId(dto.getPlaceId())
+                .orElseGet(() -> restaurantRepository.save(Restaurant.builder()
+                        .restaurantId(dto.getPlaceId())
+                        .name(dto.getPlaceName())
+                        .address(dto.getAddress())
+                        .category(dto.getCategory())
+                        .phone(dto.getPhone())
+                        .latitude(dto.getLatitude())
+                        .longitude(dto.getLongitude())
+                        .build()));
+
+        // 4. 리뷰 엔티티 생성 (ai_analysis는 "AI 분석 중입니다..."로 시작)
+        Review review = Review.builder()
+                .userId(userId)
+                .restaurant(restaurant)
+                .content(dto.getContent())
+                .rating(dto.getRating())
+                .aiAnalysis("AI 분석 중입니다...")
+                .build();
+
+        // 5. 실제 파일 저장
+        if (images != null && !images.isEmpty()) {
+            for (MultipartFile file : images) {
+                if (file != null && !file.isEmpty()) {
+                    String savedPath = fileService.saveFile(file);
+                    review.addImage(ReviewImage.builder().review(review).imageUrl(savedPath).build());
+                }
+            }
+        }
+
+        Review savedReview = reviewRepository.save(review);
+
+        // 6. 미리 백업해 둔 메모리 데이터(preparedImages)를 사용해 비동기 AI 분석 요청 전송
+        aiService.requestAsyncAnalysisWithPreparedData(savedReview.getReviewId(), dto.getContent(), userAllergies, preparedImages);
+    }
+
+    // AI 콜백 메서드
+    @Transactional
+    public void updateAiAnalysisResult(Long reviewId, String aiAnalysisResult) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 리뷰입니다. ID: " + reviewId));
+        review.updateAiAnalysis(aiAnalysisResult);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReviewResponseDto> getTop3Reviews(Long restaurantId, Long currentUserId) {
+        List<Review> topReviews = reviewRepository.findTop3ByRestaurant_RestaurantIdOrderByRatingDesc(restaurantId);
+
+        return topReviews.stream()
+                .map(review -> {
+                    User user = userRepository.findById(review.getUserId()).orElse(null);
+                    String userName = (user != null) ? user.getName() : "회원";
+                    String email = (user != null) ? user.getEmail() : "";
+
+<<<<<<< HEAD
+                    // 내가 이 리뷰에 좋아요를 눌렀는지 DB에서 확인
+=======
+                    // 💡 내가 이 리뷰에 좋아요를 눌렀는지 DB에서 확인
+>>>>>>> e023bf613bd1b9fc0746e53dfc7b540188e23dc6
+                    boolean isLiked = false;
+                    if (currentUserId != null) {
+                        isLiked = reviewLikeRepository.existsByUserIdAndReviewId(currentUserId, review.getReviewId());
+                    }
+
+<<<<<<< HEAD
+                    // DTO 생성 시 isLiked와 likeCount가 함께 담기도록 전달
+=======
+                    // 💡 DTO 생성 시 isLiked와 likeCount가 함께 담기도록 전달
+>>>>>>> e023bf613bd1b9fc0746e53dfc7b540188e23dc6
+                    return ReviewResponseDto.fromEntity(review, userName, email, isLiked);
+                })
+                .collect(Collectors.toList());
+    }
+
+    // 리뷰 수정 서비스
+    @Transactional
+    public void updateReview(Long userId, Long reviewId, ReviewRequestDto dto, List<MultipartFile> images) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 리뷰입니다. ID: " + reviewId));
+
+        if (!review.getUserId().equals(userId)) {
+            throw new IllegalStateException("본인이 작성한 리뷰만 수정할 수 있습니다.");
+        }
+
+        // 수정 시에도 파일 저장 전 가장 먼저 바이트를 메모리에 백업합니다.
+        List<AiService.ImageDataDto> preparedImages = new ArrayList<>();
+        if (images != null && !images.isEmpty()) {
+            for (MultipartFile file : images) {
+                if (file != null && !file.isEmpty()) {
+                    try {
+                        preparedImages.add(new AiService.ImageDataDto(
+                                file.getOriginalFilename(),
+                                file.getBytes()
+                        ));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        review.updateReview(dto.getContent(), dto.getRating());
+        review.updateAiAnalysis("AI 분석 중입니다...");
+        review.clearImages();
+
+        if (dto.getKeepImageUrls() != null && !dto.getKeepImageUrls().isEmpty()) {
+            for (String keepUrl : dto.getKeepImageUrls()) {
+                ReviewImage reviewImage = ReviewImage.builder()
+                        .review(review)
+                        .imageUrl(keepUrl)
+                        .build();
+                review.addImage(reviewImage);
+            }
+        }
+
+        if (images != null && !images.isEmpty()) {
+            for (MultipartFile file : images) {
+                if (file != null && !file.isEmpty()) {
+                    String savedPath = fileService.saveFile(file);
+                    ReviewImage reviewImage = ReviewImage.builder()
+                            .review(review)
+                            .imageUrl(savedPath)
+                            .build();
+                    review.addImage(reviewImage);
+                }
+            }
+        }
+
+        List<UserAllergy> allergyList = userAllergyRepository.findByUser_UserId(userId);
+        String userAllergies = allergyList.stream()
+                .map(UserAllergy::getAllergyName)
+                .collect(Collectors.joining(", "));
+        if (userAllergies.isEmpty()) userAllergies = "등록된 알레르기 없음";
+
+        // 미리 백업해 둔 메모리 데이터 전달
+        aiService.requestAsyncAnalysisWithPreparedData(review.getReviewId(), dto.getContent(), userAllergies, preparedImages);
+    }
+
+    // 리뷰 삭제 서비스
+    @Transactional
+    public void deleteReview(Long userId, Long reviewId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 리뷰입니다. ID: " + reviewId));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다. ID: " + userId));
+
+        boolean isOwner = review.getUserId().equals(userId);
+        boolean isAdmin = user.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new IllegalStateException("리뷰를 삭제할 권한이 없습니다.");
+        }
+
+        reviewRepository.delete(review);
+    }
+
+
+     // 좋아요 추가/취소 토글 (본인 글 좋아요 방지 포함)
+    @Transactional
+    public Map<String, Object> toggleLike(Long reviewId, Long userId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 리뷰입니다. ID: " + reviewId));
+
+        // 본인이 작성한 리뷰인지 확인 (셀프 좋아요 방지)
+        if (review.getUserId().equals(userId)) {
+            throw new IllegalStateException("자신이 작성한 리뷰에는 좋아요를 누를 수 없습니다.");
+        }
+
+        boolean isLiked;
+        java.util.Optional<ReviewLike> existingLike = reviewLikeRepository.findByUserIdAndReviewId(userId, reviewId);
+
+        if (existingLike.isPresent()) {
+            // 이미 좋아요를 눌렀다면 취소 (-1)
+            reviewLikeRepository.delete(existingLike.get());
+            review.decreaseLikeCount();
+            isLiked = false;
+        } else {
+            // 처음 누른다면 추가 (+1)
+            ReviewLike newLike = ReviewLike.builder()
+                    .userId(userId)
+                    .reviewId(reviewId)
+                    .build();
+            reviewLikeRepository.save(newLike);
+            review.increaseLikeCount();
+            isLiked = true;
+        }
+
+        reviewRepository.save(review);
+
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("likeCount", review.getLikeCount());
+        response.put("isLiked", isLiked);
+        return response;
+    }
+
+<<<<<<< HEAD
+=======
+    // 마이페이지용: 내가 작성한 리뷰 중 좋아요가 가장 많은 상위 3개 조회
+    @Transactional(readOnly = true)
+    public List<Review> getMyTopReviews(Long userId) {
+        return reviewRepository.findTop3ByUserIdOrderByLikeCountDescCreatedAtDesc(userId);
+    }
+>>>>>>> e023bf613bd1b9fc0746e53dfc7b540188e23dc6
+}
